@@ -107,9 +107,13 @@ drwxr-xr-x ... 1000 1000 ... /opt/opensearch-snapshots
 ### Stop OpenSearch Container
 ```bash
 cd /opt/cybersentinel/infrastructure
-docker-compose stop cybersentinel-database
-```
+docker-compose stop cybersentinel-database 
 
+```
+if not worked down all containers
+```bash
+ docker-compose down
+```
 **Expected Output:**
 ```
 Stopping cybersentinel-database ... done
@@ -149,13 +153,10 @@ nano /opt/cybersentinel/infrastructure/docker-compose.yml
 
 **Important:** Volume order matters! Data volume must be listed before snapshot volume.
 
-### Remove Old Container and Restart
+### Restart Container
 ```bash
-# Remove container (data is safe in volume!)
-docker rm -f cybersentinel-database
-
 # Start with new configuration
-docker-compose up -d cybersentinel-database
+docker-compose up -d
 
 # Wait for startup
 sleep 30
@@ -268,72 +269,70 @@ Snapshot state: SUCCESS
 
 ---
 
+---
 ## Step 5: Transfer Snapshot to NEW Server (.1.70)
-
-### Method: Transfer via soc user then move with sudo
-
-#### From OLD Server (.1.12)
+**Method:** Transfer via `soc` user using rsync, then move with sudo
+### Transfer Files from OLD Server (.1.12)
 ```bash
-# Transfer to temporary location on NEW server
-scp -r /opt/opensearch-snapshots/* soc@.1.70:/tmp/
+# Transfer snapshot files to NEW server temporary directory as soc user
+rsync -avz --progress /opt/opensearch-snapshots/ soc@192.168.1.70:/tmp/opensearch-snapshots-temp/
 ```
-
-**Alternative using rsync (if available):**
-```bash
-rsync -avz --progress /opt/opensearch-snapshots/ soc@.1.70:/tmp/opensearch-snapshots-temp/
-```
-
 **Expected Output:**
 ```
-Files transferring...
-Progress bar showing transfer
-Transfer complete ✓
+sending incremental file list
+./
+index-0
+index.latest
+meta-<uuid>.dat
+snap-<uuid>.dat
+...
+sent XXXXX bytes  received XXXXX bytes  XXXXX bytes/sec
+total size is XXXXX  speedup is X.XX
 ```
-
-#### SSH to NEW Server and Move Files
+### Move Files on NEW Server (.1.70)
 ```bash
-# SSH to NEW server
-ssh soc@.1.70
-
-# Switch to root
+# SSH into NEW server
+ssh soc@192.168.1.70
+# Switch to root user
 sudo su
-
-# Create target directory
+# Create final snapshot directory (if not exists)
 mkdir -p /opt/opensearch-snapshots
-
-# Move files from temp to final location
+# Move snapshot files from temp to final location
 mv /tmp/opensearch-snapshots-temp/* /opt/opensearch-snapshots/
-# OR if using scp:
-# mv /tmp/snapshots/* /opt/opensearch-snapshots/
-
-# Set correct ownership
+# Set correct ownership (OpenSearch runs as UID 1000)
 chown -R 1000:1000 /opt/opensearch-snapshots
+# Set directory permissions
 chmod -R 755 /opt/opensearch-snapshots
-
-# Verify files
-ls -lh /opt/opensearch-snapshots/
-
 # Exit root
 exit
-
-# Exit SSH
+# Exit SSH session
 exit
 ```
-
+### Verify Transfer Success
+```bash
+# Check files on NEW server
+ls -lh /opt/opensearch-snapshots/
+# Verify permissions
+ls -ld /opt/opensearch-snapshots/
+```
 **Expected Output:**
 ```
-Snapshot files present in /opt/opensearch-snapshots/
-Ownership: 1000:1000 ✓
+drwxr-xr-x ... 1000 1000 ... /opt/opensearch-snapshots
+-rw-r--r-- ... 1000 1000 ... index-0
+-rw-r--r-- ... 1000 1000 ... index.latest
+-rw-r--r-- ... 1000 1000 ... meta-<uuid>.dat
+-rw-r--r-- ... 1000 1000 ... snap-<uuid>.dat
 ```
-
----
-
+**Verification Checklist:**
+- ✅ Snapshot files visible in `/opt/opensearch-snapshots/`
+- ✅ Ownership: `1000:1000`
+- ✅ Permissions: `755` (directory) and `644` (files)
 ## Step 6: Configure Docker Volume Mount on NEW Server (.1.70)
 
 ### Stop OpenSearch Container
 ```bash
 cd /opt/cybersentinel/infrastructure
-docker-compose stop cybersentinel-database
+docker-compose stop
 ```
 
 ### Edit docker-compose.yml
@@ -370,11 +369,8 @@ nano /opt/cybersentinel/infrastructure/docker-compose.yml
 
 ### Restart Container
 ```bash
-# Remove old container
-docker rm -f cybersentinel-database
-
 # Start with new configuration
-docker-compose up -d cybersentinel-database
+docker-compose up -d 
 
 # Wait for startup
 sleep 30
