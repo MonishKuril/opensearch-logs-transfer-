@@ -56,7 +56,7 @@ Only system indices present (no logs-* indices)
 
 ### Network Connectivity Test
 
-#### From NEW Server (.1.70)
+##### Run from NEW server (.1.70)
 ```bash
 # Test connection to OLD server
 curl -X GET "http://.1.12:9200/_cluster/health"
