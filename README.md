@@ -2,7 +2,7 @@
 
 ## Migration Overview
 
-**Objective:** Migrate OpenSearch indices from OLD server (192.168.1.12) to NEW server (192.168.1.70)
+**Objective:** Migrate OpenSearch indices from OLD server (.1.12) to NEW server (.1.70)
 
 **Method Used:** Snapshot & Restore (File System Repository)
 
@@ -16,16 +16,16 @@
 
 ### Check OpenSearch Status on Both Servers
 
-#### OLD Server (192.168.1.12)
+#### OLD Server (.1.12)
 ```bash
 # Verify OpenSearch is running
 docker ps | grep cybersentinel-database
 
 # Check cluster health
-curl -X GET "http://192.168.1.12:9200/_cluster/health?pretty"
+curl -X GET "http://.1.12:9200/_cluster/health?pretty"
 
 # List all indices
-curl -X GET "http://192.168.1.12:9200/_cat/indices?v&s=store.size:asc"
+curl -X GET "http://.1.12:9200/_cat/indices?v&s=store.size:asc"
 ```
 
 **Expected Output:**
@@ -35,16 +35,16 @@ Cluster health: green
 Total indices: 49 (logs + system indices)
 ```
 
-#### NEW Server (192.168.1.70)
+#### NEW Server (.1.70)
 ```bash
 # Verify OpenSearch is running
 docker ps | grep cybersentinel-database
 
 # Check cluster health
-curl -X GET "http://192.168.1.70:9200/_cluster/health?pretty"
+curl -X GET "http://.1.70:9200/_cluster/health?pretty"
 
 # Verify it's empty
-curl -X GET "http://192.168.1.70:9200/_cat/indices?v"
+curl -X GET "http://.1.70:9200/_cat/indices?v"
 ```
 
 **Expected Output:**
@@ -56,10 +56,10 @@ Only system indices present (no logs-* indices)
 
 ### Network Connectivity Test
 
-#### From NEW Server (192.168.1.70)
+#### From NEW Server (.1.70)
 ```bash
 # Test connection to OLD server
-curl -X GET "http://192.168.1.12:9200/_cluster/health"
+curl -X GET "http://.1.12:9200/_cluster/health"
 ```
 
 **Expected Output:**
@@ -69,7 +69,7 @@ curl -X GET "http://192.168.1.12:9200/_cluster/health"
 
 ---
 
-## Step 1: Prepare Snapshot Directory on OLD Server (192.168.1.12)
+## Step 1: Prepare Snapshot Directory on OLD Server (.1.12)
 
 ### Create Snapshot Directory
 ```bash
@@ -102,7 +102,7 @@ drwxr-xr-x ... 1000 1000 ... /opt/opensearch-snapshots
 
 ---
 
-## Step 2: Configure Docker Volume Mount on OLD Server (192.168.1.12)
+## Step 2: Configure Docker Volume Mount on OLD Server (.1.12)
 
 ### Stop OpenSearch Container
 ```bash
@@ -162,10 +162,10 @@ sleep 30
 
 # Verify it's running
 docker ps | grep cybersentinel-database
-curl -X GET "http://192.168.1.12:9200/_cluster/health?pretty"
+curl -X GET "http://.1.12:9200/_cluster/health?pretty"
 
 # CRITICAL: Verify data is intact
-curl -X GET "http://192.168.1.12:9200/_cat/indices?v" | grep logs-2026
+curl -X GET "http://.1.12:9200/_cat/indices?v" | grep logs-2026
 ```
 
 **Expected Output:**
@@ -177,11 +177,11 @@ All 49 indices still present ✓
 
 ---
 
-## Step 3: Register Snapshot Repository on OLD Server (192.168.1.12)
+## Step 3: Register Snapshot Repository on OLD Server (.1.12)
 
 ### Register File System Repository
 ```bash
-curl -X PUT "http://192.168.1.12:9200/_snapshot/backup_repo" -H 'Content-Type: application/json' -d'
+curl -X PUT "http://.1.12:9200/_snapshot/backup_repo" -H 'Content-Type: application/json' -d'
 {
   "type": "fs",
   "settings": {
@@ -198,7 +198,7 @@ curl -X PUT "http://192.168.1.12:9200/_snapshot/backup_repo" -H 'Content-Type: a
 
 ### Verify Repository Registration
 ```bash
-curl -X GET "http://192.168.1.12:9200/_snapshot/backup_repo?pretty"
+curl -X GET "http://.1.12:9200/_snapshot/backup_repo?pretty"
 ```
 
 **Expected Output:**
@@ -216,11 +216,11 @@ curl -X GET "http://192.168.1.12:9200/_snapshot/backup_repo?pretty"
 
 ---
 
-## Step 4: Create Snapshot of Test Index on OLD Server (192.168.1.12)
+## Step 4: Create Snapshot of Test Index on OLD Server (.1.12)
 
 ### Create Snapshot
 ```bash
-curl -X PUT "http://192.168.1.12:9200/_snapshot/backup_repo/test_snapshot_jan12?wait_for_completion=true" -H 'Content-Type: application/json' -d'
+curl -X PUT "http://.1.12:9200/_snapshot/backup_repo/test_snapshot_jan12?wait_for_completion=true" -H 'Content-Type: application/json' -d'
 {
   "indices": "logs-2026-01-12",
   "ignore_unavailable": true,
@@ -257,7 +257,7 @@ curl -X PUT "http://192.168.1.12:9200/_snapshot/backup_repo/test_snapshot_jan12?
 ls -lh /opt/opensearch-snapshots/
 
 # Check snapshot details
-curl -X GET "http://192.168.1.12:9200/_snapshot/backup_repo/test_snapshot_jan12?pretty"
+curl -X GET "http://.1.12:9200/_snapshot/backup_repo/test_snapshot_jan12?pretty"
 ```
 
 **Expected Output:**
@@ -268,19 +268,19 @@ Snapshot state: SUCCESS
 
 ---
 
-## Step 5: Transfer Snapshot to NEW Server (192.168.1.70)
+## Step 5: Transfer Snapshot to NEW Server (.1.70)
 
 ### Method: Transfer via soc user then move with sudo
 
-#### From OLD Server (192.168.1.12)
+#### From OLD Server (.1.12)
 ```bash
 # Transfer to temporary location on NEW server
-scp -r /opt/opensearch-snapshots/* soc@192.168.1.70:/tmp/
+scp -r /opt/opensearch-snapshots/* soc@.1.70:/tmp/
 ```
 
 **Alternative using rsync (if available):**
 ```bash
-rsync -avz --progress /opt/opensearch-snapshots/ soc@192.168.1.70:/tmp/opensearch-snapshots-temp/
+rsync -avz --progress /opt/opensearch-snapshots/ soc@.1.70:/tmp/opensearch-snapshots-temp/
 ```
 
 **Expected Output:**
@@ -293,7 +293,7 @@ Transfer complete ✓
 #### SSH to NEW Server and Move Files
 ```bash
 # SSH to NEW server
-ssh soc@192.168.1.70
+ssh soc@.1.70
 
 # Switch to root
 sudo su
@@ -328,7 +328,7 @@ Ownership: 1000:1000 ✓
 
 ---
 
-## Step 6: Configure Docker Volume Mount on NEW Server (192.168.1.70)
+## Step 6: Configure Docker Volume Mount on NEW Server (.1.70)
 
 ### Stop OpenSearch Container
 ```bash
@@ -381,7 +381,7 @@ sleep 30
 
 # Verify
 docker ps | grep cybersentinel-database
-curl -X GET "http://192.168.1.70:9200/_cluster/health?pretty"
+curl -X GET "http://.1.70:9200/_cluster/health?pretty"
 ```
 
 **Expected Output:**
@@ -392,11 +392,11 @@ Cluster health: green
 
 ---
 
-## Step 7: Register Repository on NEW Server (192.168.1.70)
+## Step 7: Register Repository on NEW Server (.1.70)
 
 ### Register Snapshot Repository
 ```bash
-curl -X PUT "http://192.168.1.70:9200/_snapshot/backup_repo" -H 'Content-Type: application/json' -d'
+curl -X PUT "http://.1.70:9200/_snapshot/backup_repo" -H 'Content-Type: application/json' -d'
 {
   "type": "fs",
   "settings": {
@@ -413,10 +413,10 @@ curl -X PUT "http://192.168.1.70:9200/_snapshot/backup_repo" -H 'Content-Type: a
 
 ### Verify Repository and See Available Snapshots
 ```bash
-curl -X GET "http://192.168.1.70:9200/_snapshot/backup_repo?pretty"
+curl -X GET "http://.1.70:9200/_snapshot/backup_repo?pretty"
 
 # List all snapshots
-curl -X GET "http://192.168.1.70:9200/_snapshot/backup_repo/_all?pretty"
+curl -X GET "http://.1.70:9200/_snapshot/backup_repo/_all?pretty"
 ```
 
 **Expected Output:**
@@ -433,11 +433,11 @@ curl -X GET "http://192.168.1.70:9200/_snapshot/backup_repo/_all?pretty"
 
 ---
 
-## Step 8: Restore Index on NEW Server (192.168.1.70)
+## Step 8: Restore Index on NEW Server (.1.70)
 
 ### Restore the Test Index
 ```bash
-curl -X POST "http://192.168.1.70:9200/_snapshot/backup_repo/test_snapshot_jan12/_restore?wait_for_completion=true" -H 'Content-Type: application/json' -d'
+curl -X POST "http://.1.70:9200/_snapshot/backup_repo/test_snapshot_jan12/_restore?wait_for_completion=true" -H 'Content-Type: application/json' -d'
 {
   "indices": "logs-2026-01-12",
   "ignore_unavailable": true,
@@ -464,11 +464,11 @@ curl -X POST "http://192.168.1.70:9200/_snapshot/backup_repo/test_snapshot_jan12
 
 ---
 
-## Step 9: Verify Migration Success on NEW Server (192.168.1.70)
+## Step 9: Verify Migration Success on NEW Server (.1.70)
 
 ### Check Index Presence
 ```bash
-curl -X GET "http://192.168.1.70:9200/_cat/indices/logs-2026-01-12?v"
+curl -X GET "http://.1.70:9200/_cat/indices/logs-2026-01-12?v"
 ```
 
 **Expected Output:**
@@ -479,7 +479,7 @@ green  open   logs-2026-01-12 ...    1   0   720660     0            949.3mb    
 
 ### Verify Document Count
 ```bash
-curl -X GET "http://192.168.1.70:9200/logs-2026-01-12/_count?pretty"
+curl -X GET "http://.1.70:9200/logs-2026-01-12/_count?pretty"
 ```
 
 **Expected Output:**
@@ -497,7 +497,7 @@ curl -X GET "http://192.168.1.70:9200/logs-2026-01-12/_count?pretty"
 
 ### Sample Data Verification
 ```bash
-curl -X GET "http://192.168.1.70:9200/logs-2026-01-12/_search?size=3&pretty"
+curl -X GET "http://.1.70:9200/logs-2026-01-12/_search?size=3&pretty"
 ```
 
 **Expected Output:**
@@ -515,7 +515,7 @@ curl -X GET "http://192.168.1.70:9200/logs-2026-01-12/_search?size=3&pretty"
 
 ### Check Index Health
 ```bash
-curl -X GET "http://192.168.1.70:9200/_cat/indices/logs-2026-01-12?v&h=index,health,status,docs.count,store.size"
+curl -X GET "http://.1.70:9200/_cat/indices/logs-2026-01-12?v&h=index,health,status,docs.count,store.size"
 ```
 
 **Expected Output:**
@@ -525,7 +525,7 @@ logs-2026-01-12 green  open   720660     949.3mb
 ```
 
 ### Verify via OpenSearch Dashboard
-Open in browser: `http://192.168.1.70:5601`
+Open in browser: `http://.1.70:5601`
 
 Navigate to: **Index Management → Indexes → logs-2026-01-12**
 
@@ -579,7 +579,7 @@ Create a script to automate the remaining migrations:
 
 ```bash
 #!/bin/bash
-# migration-script.sh - Run on OLD server (192.168.1.12)
+# migration-script.sh - Run on OLD server (.1.12)
 
 INDICES=(
   "logs-2025-12-25"
@@ -592,7 +592,7 @@ for INDEX in "${INDICES[@]}"; do
   echo "=== Migrating $INDEX ==="
   
   # Create snapshot
-  curl -X PUT "http://192.168.1.12:9200/_snapshot/backup_repo/snapshot_$INDEX?wait_for_completion=true" \
+  curl -X PUT "http://.1.12:9200/_snapshot/backup_repo/snapshot_$INDEX?wait_for_completion=true" \
     -H 'Content-Type: application/json' -d"{
     \"indices\": \"$INDEX\",
     \"ignore_unavailable\": true,
@@ -600,11 +600,11 @@ for INDEX in "${INDICES[@]}"; do
   }"
   
   # Transfer to NEW server
-  rsync -avz /opt/opensearch-snapshots/ soc@192.168.1.70:/tmp/snapshots/
+  rsync -avz /opt/opensearch-snapshots/ soc@.1.70:/tmp/snapshots/
   
   # Restore on NEW server
-  ssh soc@192.168.1.70 "sudo rsync -a /tmp/snapshots/ /opt/opensearch-snapshots/ && \
-    curl -X POST 'http://192.168.1.70:9200/_snapshot/backup_repo/snapshot_$INDEX/_restore?wait_for_completion=true' \
+  ssh soc@.1.70 "sudo rsync -a /tmp/snapshots/ /opt/opensearch-snapshots/ && \
+    curl -X POST 'http://.1.70:9200/_snapshot/backup_repo/snapshot_$INDEX/_restore?wait_for_completion=true' \
     -H 'Content-Type: application/json' -d'{
       \"indices\": \"$INDEX\",
       \"ignore_unavailable\": true,
@@ -647,7 +647,7 @@ ls -lh /opt/opensearch-snapshots/
 
 **Solution:** Re-register repository and check:
 ```bash
-curl -X GET "http://192.168.1.70:9200/_snapshot/backup_repo/_all?pretty"
+curl -X GET "http://.1.70:9200/_snapshot/backup_repo/_all?pretty"
 ```
 
 ---
