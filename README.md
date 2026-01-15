@@ -10,6 +10,32 @@
 
 **Status:** ✅ Successfully Completed
 
+
+---
+
+### Execution Flow: 
+
+OLD SERVER (.1.12)
+OpenSearch Container
+        │
+        ▼
+Filesystem Snapshot
+(/usr/share/opensearch/snapshots)
+        │ (Docker Volume Mount)
+        ▼
+Host Directory
+(/opt/opensearch-snapshots)
+        │ (rsync over SSH)
+        ▼
+NEW SERVER Host
+(/opt/opensearch-snapshots)
+        │ (Docker Volume Mount)
+        ▼
+NEW OpenSearch Container
+        │
+        ▼
+Restore Snapshot → Index Created
+
 ---
 
 ## Prerequisites Verification
